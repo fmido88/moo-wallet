@@ -1,14 +1,14 @@
 <?php
 /*
 Plugin Name: Moo Wallet
-Description: A plugin that manages user credits.
+Description: A plugin that connects the users balances in Tera wallet in wordpress website with wallet ballance in enrol_wallet in moodle.
 Version: 1.0
-Author: Your Name
+Author: Mohamed Farouk
 */
 
 add_action('rest_api_init', function () {
-    register_rest_route('moo-wallet/v1', '/balance/(?P<moodle_user_id>\d+)', array(
-        'methods' => 'GET',
+    register_rest_route('moo-wallet/v1', '/balance', array(
+        'methods' => 'POST',
         'callback' => 'moo_wallet_get_credits',
         'permission_callback' => '__return_true',
     ));
@@ -30,6 +30,12 @@ add_action('rest_api_init', function () {
         'callback' => 'moo_wallet_topup',
         'permission_callback' => '__return_true',
     ));
+
+    register_rest_route('moo-wallet/v1', '/create_user', array(
+        'methods' => 'POST',
+        'callback' => 'moo_wallet_create_user',
+        'permission_callback' => '__return_true',
+    ));
 });
 
 function get_user_id_by_meta($meta_key, $meta_value) {
@@ -41,7 +47,7 @@ function get_user_id_by_meta($meta_key, $meta_value) {
     if (!empty($users)) {
         return $users[0];
     }
-    return 'user not exist';
+    return false;
 }
 function moo_wallet_topup($request) {
     // Get the coupon code and Moodle user ID from the request.
@@ -126,7 +132,7 @@ function moo_wallet_get_credits($request) {
     $moodle_user_id = $request->get_param('moodle_user_id');
     // Retrieve the WordPress user ID from the user_meta with key 'moodle_user_id'.
     $wordpress_user_id = get_user_id_by_meta('moodle_user_id', $moodle_user_id);
-    if (!$wordpress_user_id || 0 == $wordpress_user_id) {
+    if (empty($wordpress_user_id) || !is_numeric($wordpress_user_id)) {
         return 'no associated wordpress user';
     }
     // Retrieve the user's credit from the user_meta with key '_current_woo_wallet_balance'.
@@ -155,7 +161,7 @@ function moo_wallet_deduct_credits($request) {
     $charger = $request->get_param('charger');
     // Retrieve the WordPress user ID from the user_meta with key 'moodle_user_id'.
     $wordpress_user_id = get_user_id_by_meta('moodle_user_id', $moodle_user_id);
-    if (!$wordpress_user_id || 0 === $wordpress_user_id) {
+    if (empty($wordpress_user_id) || !is_numeric($wordpress_user_id)) {
         return 'no associated wordpress user';
     }
     $chargerid = get_user_id_by_meta('moodle_user_id', $charger);
@@ -198,7 +204,7 @@ function moo_wallet_deduct_credits($request) {
 function moo_wallet_add_credits($moodle_user_id, $amount, $desc, $charger) {
     // Retrieve the WordPress user ID from the user_meta with key 'moodle_user_id'.
     $wordpress_user_id = get_user_id_by_meta('moodle_user_id', $moodle_user_id);
-    if (!$wordpress_user_id || 0 == $wordpress_user_id) {
+    if (empty($wordpress_user_id) || !is_numeric($wordpress_user_id)) {
         return 'no associated wordpress user';
     }
     $chargerid = get_user_id_by_meta('moodle_user_id', $charger);
@@ -242,14 +248,18 @@ function moo_wallet_create_user($request) {
     $username = $request->get_param('username');
     $password = $request->get_param('password');
     $email = $request->get_param('email');
-    $moodleid = $request->get_param('userid');
+    $moodleid = $request->get_param('moodle_user_id');
 
-    $id = wp_create_user($username, $password, $email);
-    if (!$id) {
-        $user = get_user_by('email', $email);
+    $user = get_user_by('email', $email);
+    // if (!$user) {
+    //     $user = get_user_by('username', $username);
+    // }
+
+    if ($user) {
+        $id = $user->ID;
     } else {
-        $user = get_user_by('id', $id);
+        $id = wp_create_user($username, $password, $email);
     }
 
-    update_user_meta($user->id, 'moodle_user_id', $moodleid);
+    return update_user_meta($id, 'moodle_user_id', $moodleid);
 }
