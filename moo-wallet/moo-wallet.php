@@ -113,11 +113,11 @@ function moo_wallet_get_coupon_value($request) {
         // Mark the coupon as used.
         $coupon->set_usage_count($current_usage + 1);
         $coupon->save();
-        if ($coupon_type == 'fixed_cart') {
-            $desc = 'charging wallet from LMS by coupon code: '.$coupon_code;
-            // Add credits to the Moodle user's wallet.
-            moo_wallet_add_credits($moodle_user_id, (int)$coupon_value, $desc, $charger);
-        }
+        // if ($coupon_type == 'fixed_cart') {
+        //     $desc = 'charging wallet from LMS by coupon code: '.$coupon_code;
+        //     // Add credits to the Moodle user's wallet.
+        //     moo_wallet_add_credits($moodle_user_id, (int)$coupon_value, $desc, $charger);
+        // }
     }
 
     // error_log("Coupon marked as used.");
