@@ -1,6 +1,6 @@
-=== Plugin Name ===
-Moo Wallet
-Contributors: Mohammad Farouk
+=== Moo Wallet ===
+
+Contributors: pharouk
 
 Tags: Moodle, Terawallet
 
@@ -9,6 +9,8 @@ Requires at least: 6.0
 Tested up to: 6.2
 
 Stable tag: 6.2
+
+Requires PHP: 7.0
 
 License: GPLv2 or later
 
