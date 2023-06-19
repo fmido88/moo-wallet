@@ -1,4 +1,4 @@
-=== Moo-Wallet ===
+=== Moo Wallet ===
 
 Contributors: Mohammad Farouk
 
