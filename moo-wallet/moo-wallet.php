@@ -2,7 +2,7 @@
 /*
 Plugin Name: Moo Wallet
 Description: A plugin that connects the users balances in Tera wallet in wordpress website with wallet ballance in enrol_wallet in moodle.
-Version: 2.0
+Version: 2.1
 Author: Mohamed Farouk
 */
 if ( ! defined( 'ABSPATH' ) ) {
@@ -37,12 +37,6 @@ add_action('rest_api_init', function () {
     register_rest_route('moo-wallet/v1', '/create_user', array(
         'methods' => 'POST',
         'callback' => 'moo_wallet_create_user',
-        'permission_callback' => '__return_true',
-    ));
-
-    register_rest_route('moo-wallet/v1', '/login_logout', array(
-        'methods' => 'POST',
-        'callback' => 'moo_wallet_login_logout_user',
         'permission_callback' => '__return_true',
     ));
 });
@@ -313,6 +307,21 @@ function moo_wallet_create_user($request) {
     $email = $data['email'];
     $moodleid = $data['moodle_user_id'];
 
+    $id = moo_wallet_create_user_local($username, $password, $email, $moodleid);
+
+    return $id;
+}
+
+/**
+ * Creating user from moodle in wordpress.
+ * @param string $username
+ * @param string $password
+ * @param string $email
+ * @param int $moodleid
+ * @return bool|int|string
+ */
+function moo_wallet_create_user_local($username, $password, $email, $moodleid) {
+
     $user = get_user_by('email', $email);
     // if (!$user) {
     //     $user = get_user_by('username', $username);
@@ -324,47 +333,87 @@ function moo_wallet_create_user($request) {
         $id = wp_create_user($username, $password, $email);
     }
 
-    return update_user_meta($id, 'moodle_user_id', $moodleid);
-}
+    if (!update_user_meta($id, 'moodle_user_id', $moodleid)) {
+        return false;
+    }
 
+    return $id;
+}
 /**
  * Used to login or logout the user from wordpress website when the same action done on moodle.
- * @param mixed $request
- * @return bool|string
+ * @return void
  */
-function moo_wallet_login_logout_user($request) {
-    $encdata = $request->get_param('encdata');
+function moo_wallet_login_logout_user() {
+    $encdata = $_GET['encdata'];
+    $moodleurl = $_GET['moodleurl'];
+
     $data = moo_wallet_decrypt_data($encdata);
     if (empty($data)) {
-        return 'Key not match';
+        moo_wallet_debug('Key not match');
+        wp_redirect($moodleurl);
+        exit;
     }
+
     $moodleid = $data['moodle_user_id'];
     $method = $data['method'];
+    $url = $data['url'];
+
+    if (empty($url)) {
+        $url = $moodleurl;
+    }
+
     $wordpress_user_id = moo_wallet_userid_by_moodleid($moodleid);
+
+    if (empty($wordpress_user_id)) {
+        $username = $data['username'];
+        $email = $data['email'];
+        $password = wp_generate_password();
+        $wordpress_user_id = moo_wallet_create_user_local($username, $password, $email, $moodleid);
+    }
+
     if (!empty($wordpress_user_id)) {
         // Login the user.
         if ($method == 'login') {
             if (is_user_logged_in()) {
                 wp_logout();
             }
+
+            $user = get_userdata($wordpress_user_id);
+
+            if (!$user) {
+                wp_redirect($moodleurl);
+            }
+
             wp_clear_auth_cookie();
-            wp_set_auth_cookie($wordpress_user_id);
-            wp_set_current_user($wordpress_user_id);
-            return true;
+            wp_set_auth_cookie($wordpress_user_id, true, false);
+
+            wp_set_current_user($wordpress_user_id, $user->user_login);
+            // do_action('wp_login', $user->user_login, $user);
+
+            wp_redirect($url);
         // Logout the user.
         } else if ($method == 'logout') {
-            if (is_user_logged_in()) {
-                wp_logout();
-            }
-            return true;
-        // Invalid method.
-        } else {
-            return false;
+            wp_logout();
+            wp_clear_auth_cookie();
+            wp_redirect($url);
+            do_action('wp_logout', $wordpress_user_id);
+        } else { // Invalid method.
+            wp_redirect($moodleurl);
         }
     } else {
+        wp_redirect($moodleurl);
         // User not found.
-        return false;
     }
+}
+
+if (isset($_GET['encdata']) && isset($_GET['moodleurl'])) {
+    add_action('template_redirect', 'moo_wallet_login_logout_user');
+}
+
+function moo_wallet_debug($msg) {
+    $time = date('F j, Y h:i:s a');
+    $message = "($time): $msg \n";
+    error_log($message, 3, __DIR__.'/debug.log');
 }
 /**
  * Decrypt the data came from moodle request.
