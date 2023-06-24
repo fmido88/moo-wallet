@@ -385,7 +385,7 @@ function moo_wallet_login_logout_user() {
             }
 
             wp_clear_auth_cookie();
-            wp_set_auth_cookie($wordpress_user_id, true, false);
+            wp_set_auth_cookie($wordpress_user_id, true);
 
             wp_set_current_user($wordpress_user_id, $user->user_login);
             // do_action('wp_login', $user->user_login, $user);
