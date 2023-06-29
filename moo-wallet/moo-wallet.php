@@ -102,7 +102,7 @@ function moo_wallet_get_coupon_value($request) {
     // Get the coupon code and Moodle user ID from the request.
     $coupon_code = $data['coupon'];
     $instanceid= $data['instanceid'];
-    $apply = $data['apply'];
+    $apply = (bool)$data['apply'];
     // Create a new WC_Coupon object with the coupon code.
     $coupon = new WC_Coupon($coupon_code);
 
@@ -129,7 +129,7 @@ function moo_wallet_get_coupon_value($request) {
         return array('err' => "Coupon has reached its maximum usage.");
     }
 
-    if ($apply == 'true' || $apply === true) {
+    if ($apply) {
         // Mark the coupon as used.
         $coupon->set_usage_count($current_usage + 1);
         $coupon->save();
