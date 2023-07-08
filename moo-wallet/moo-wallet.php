@@ -2,7 +2,7 @@
 /*
 Plugin Name: Moo Wallet
 Description: A plugin that connects the users balances in Tera wallet in wordpress website with wallet ballance in enrol_wallet in moodle.
-Version: 2.1
+Version: 2.2
 Author: Mohamed Farouk
 */
 if ( ! defined( 'ABSPATH' ) ) {
@@ -10,35 +10,35 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 // Register rest api callbacks.
 add_action('rest_api_init', function () {
-    register_rest_route('moo-wallet/v1', '/balance', array(
+    register_rest_route('moo-wallet/v1', '/balance', [
         'methods' => 'POST',
         'callback' => 'moo_wallet_get_credits',
         'permission_callback' => '__return_true',
-    ));
+    ]);
 
-    register_rest_route('moo-wallet/v1', '/debit', array(
+    register_rest_route('moo-wallet/v1', '/debit', [
         'methods' => 'POST',
         'callback' => 'moo_wallet_deduct_credits',
 		'permission_callback' => '__return_true',
-    ));
+    ]);
 
-    register_rest_route('moo-wallet/v1', '/get_coupon_value', array(
+    register_rest_route('moo-wallet/v1', '/get_coupon_value', [
         'methods' => 'POST',
         'callback' => 'moo_wallet_get_coupon_value',
         'permission_callback' => '__return_true',
-    ));
+    ]);
 
-    register_rest_route('moo-wallet/v1', '/wallet_topup', array(
+    register_rest_route('moo-wallet/v1', '/wallet_topup', [
         'methods' => 'POST',
         'callback' => 'moo_wallet_topup',
         'permission_callback' => '__return_true',
-    ));
+    ]);
 
-    register_rest_route('moo-wallet/v1', '/create_user', array(
+    register_rest_route('moo-wallet/v1', '/create_user', [
         'methods' => 'POST',
         'callback' => 'moo_wallet_create_user',
         'permission_callback' => '__return_true',
-    ));
+    ]);
 });
 
 /**
@@ -47,11 +47,11 @@ add_action('rest_api_init', function () {
  * @return int|false the user->ID or false if not found.
  */
 function moo_wallet_userid_by_moodleid($moodle_user_id) {
-    $users = get_users(array(
+    $users = get_users([
         'meta_key' => 'moodle_user_id',
         'meta_value' => $moodle_user_id,
         'fields' => 'ID',
-    ));
+    ]);
     if (!empty($users)) {
         return $users[0];
     }
@@ -76,17 +76,20 @@ function moo_wallet_topup($request) {
     // Check if there is a correct value.
     if ($amount <= 0 || !is_numeric($amount)) {
         // Invalid value for amount.
-        return array('err' => "invalid amount entered.", 'success' => 'false');
+        return ['err' => "invalid amount entered.", 'success' => 'false'];
     }
+
     if ($desc == '') {
         $desc = 'charged by payment from LMS';
     }
+
     // Add credits to the Moodle user's wallet.
     $addition = moo_wallet_add_credits($moodle_user_id, $amount, $desc, $charger);
     if (!is_numeric($addition)){
-        return array('err' => $addition, 'success' => 'false');
+        return ['err' => $addition, 'success' => 'false'];
     }
-    return array('success' => 'true');
+
+    return ['success' => 'true'];
 }
 /**
  * Get the value of a coupon, its type and mark it used if applied.
@@ -102,14 +105,19 @@ function moo_wallet_get_coupon_value($request) {
     // Get the coupon code and Moodle user ID from the request.
     $coupon_code = $data['coupon'];
     $instanceid= $data['instanceid'];
-    $apply = (bool)$data['apply'];
+    $apply = $data['apply'];
+    if ($apply == 'true' || $apply == 1 || $apply == true || $apply == 'yes') {
+        $apply = true;
+    } else {
+        $apply = false;
+    }
     // Create a new WC_Coupon object with the coupon code.
     $coupon = new WC_Coupon($coupon_code);
 
     // Check if the coupon exists.
     if (empty($coupon)) {
         // Coupon is not valid.
-        return array('err' => "Coupon code is not valid.");
+        return ['err' => "Coupon code is not valid."];
     }
     // Check if the type of the coupon.
     $coupon_type = $coupon->get_discount_type();
@@ -118,7 +126,7 @@ function moo_wallet_get_coupon_value($request) {
     $coupon_value = $coupon->get_amount();
     if ($coupon_value == 0) {
         // Coupon is not valid or is not a fixed cart discount.
-        return array('err' => "Coupon has no value or not exist.");
+        return ['err' => "Coupon has no value or not exist."];
     }
     // Check if the coupon has reached its maximum usage.
     $max_usage = $coupon->get_usage_limit();
@@ -126,7 +134,7 @@ function moo_wallet_get_coupon_value($request) {
     if ($max_usage && $current_usage >= $max_usage) {
         // Coupon has reached its maximum usage.
         // error_log("Coupon has reached its maximum usage.");
-        return array('err' => "Coupon has reached its maximum usage.");
+        return ['err' => "Coupon has reached its maximum usage."];
     }
 
     if ($apply) {
@@ -220,7 +228,7 @@ function moo_wallet_deduct_credits($request) {
 	$wpdb->insert( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
 		"{$wpdb->base_prefix}woo_wallet_transactions",
 
-			array(
+			[
 				'blog_id'    => $GLOBALS['blog_id'],
 				'user_id'    => $wordpress_user_id,
 				'type'       => 'debit',
@@ -230,8 +238,8 @@ function moo_wallet_deduct_credits($request) {
 				'details'    => 'enrolment from the LMS in '.$name,
 				'date'       => current_time( 'mysql' ),
 				'created_by' => $chargerid,
-			),
-			array( '%d', '%d', '%s', '%f', '%f', '%s', '%s', '%s', '%d' )	
+			],
+			[ '%d', '%d', '%s', '%f', '%f', '%s', '%s', '%s', '%d' ]	
 		);
     $transaction_id = $wpdb->insert_id;
     update_user_meta( $wordpress_user_id, '_current_woo_wallet_balance', $balance );
@@ -271,7 +279,7 @@ function moo_wallet_add_credits($moodle_user_id, $amount, $desc, $charger) {
 	$wpdb->insert( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
 		"{$wpdb->base_prefix}woo_wallet_transactions",
 
-			array(
+			[
 				'blog_id'    => $GLOBALS['blog_id'],
 				'user_id'    => $wordpress_user_id,
 				'type'       => 'credit',
@@ -281,8 +289,8 @@ function moo_wallet_add_credits($moodle_user_id, $amount, $desc, $charger) {
 				'details'    => $desc,
 				'date'       => current_time( 'mysql' ),
 				'created_by' => $chargerid,
-			),
-			array( '%d', '%d', '%s', '%f', '%f', '%s', '%s', '%s', '%d' )	
+			],
+			[ '%d', '%d', '%s', '%f', '%f', '%s', '%s', '%s', '%d' ]	
 		);
     $transaction_id = $wpdb->insert_id;
     update_user_meta( $wordpress_user_id, '_current_woo_wallet_balance', $balance );
@@ -313,7 +321,7 @@ function moo_wallet_create_user($request) {
 }
 
 /**
- * Creating user from moodle in wordpress.
+ * Creating or update user from moodle in wordpress.
  * @param string $username
  * @param string $password
  * @param string $email
@@ -322,19 +330,41 @@ function moo_wallet_create_user($request) {
  */
 function moo_wallet_create_user_local($username, $password, $email, $moodleid) {
 
-    $user = get_user_by('email', $email);
-    // if (!$user) {
-    //     $user = get_user_by('username', $username);
-    // }
+    $user1 = get_user_by('email', $email);
+    $user2 = get_user_by('username', $username);
+    $userid = moo_wallet_userid_by_moodleid($moodleid);
+    if (!empty($userid)) {
+        $user3 = get_user_by('id', $userid);
+    }
 
-    if ($user) {
-        $id = $user->ID;
-    } else {
+    if (empty($user1) && empty($user2) && empty($user3)) {
         $id = wp_create_user($username, $password, $email);
+    } else {
+        if (!empty($user1) && empty($user2) && empty($user3)) {
+            $user = $user1;
+        } else if (empty($user1) && !empty($user2) && empty($user3)) {
+            $user = $user2;
+        } else if (empty($user1) && empty($user2) && !empty($user3)) {
+            $user = $user3;
+        } else if (!empty($user1) && $user1 === $user2 && empty($user3)) {
+            $user = $user1;
+        } else if (!empty($user3) && $user1 === $user2 && $user2 === $user3) {
+            $user = $user3;
+        } else {
+            return 'Multiple users existed.';
+        }
+
+        $userdata = [
+            'id' => $user->ID,
+            'username' => $username,
+            'password' => $password,
+            'email' => $email,
+        ];
+        wp_update_user($userdata);
     }
 
     if (!update_user_meta($id, 'moodle_user_id', $moodleid)) {
-        return false;
+        return 'Cannot update user meta.';
     }
 
     return $id;
@@ -422,7 +452,7 @@ function moo_wallet_debug($msg) {
  */
 function moo_wallet_decrypt_data($encrypteddata) {
     $secretkey = get_option( 'moo_wallet_secret_key' );
-    $data = str_replace( array( '-', '_' ), array( '+', '/' ), $encrypteddata );
+    $data = str_replace( [ '-', '_' ], [ '+', '/' ], $encrypteddata );
     $mod4 = strlen( $data ) % 4;
     if ($mod4) {
         $data .= substr('====', $mod4);
@@ -487,11 +517,11 @@ function moo_wallet_register_settings() {
     register_setting(
         'moo-wallet-settings',
         'moo_wallet_secret_key',
-        array(
+        [
             'type' => 'string',
             'sanitize_callback' => 'sanitize_text_field',
             'default' => '',
-        )
+        ]
     );
 
     add_settings_section(
