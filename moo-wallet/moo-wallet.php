@@ -310,6 +310,7 @@ function moo_wallet_create_user($request) {
     if (empty($data)) {
         return 'Key not match';
     }
+
     $username = $data['username'];
     $password = $data['password'];
     $email = $data['email'];
@@ -369,6 +370,7 @@ function moo_wallet_create_user_local($username, $password, $email, $moodleid) {
 
     return $id;
 }
+
 /**
  * Used to login or logout the user from wordpress website when the same action done on moodle.
  * @return void
@@ -405,7 +407,12 @@ function moo_wallet_login_logout_user() {
         // Login the user.
         if ($method == 'login') {
             if (is_user_logged_in()) {
-                wp_logout();
+                if (get_current_user_id() != $wordpress_user_id) {
+                    // Logout the user because it is not the same user.
+                    wp_destroy_current_session();
+                    wp_clear_auth_cookie();
+                    wp_set_current_user(0);
+                }
             }
 
             $user = get_userdata($wordpress_user_id);
@@ -414,25 +421,27 @@ function moo_wallet_login_logout_user() {
                 wp_redirect($moodleurl);
             }
 
-            wp_clear_auth_cookie();
             wp_set_auth_cookie($wordpress_user_id, true);
-
             wp_set_current_user($wordpress_user_id, $user->user_login);
             // do_action('wp_login', $user->user_login, $user);
 
             wp_redirect($url);
+            exit;
         // Logout the user.
         } else if ($method == 'logout') {
             wp_logout();
             wp_clear_auth_cookie();
             wp_redirect($url);
             do_action('wp_logout', $wordpress_user_id);
+            exit;
         } else { // Invalid method.
             wp_redirect($moodleurl);
+            exit;
         }
     } else {
         wp_redirect($moodleurl);
         // User not found.
+        exit;
     }
 }
 
